@@ -1,0 +1,57 @@
+module fifo (
+    input wire clk,
+    input wire rst,               // Active high synchronous reset
+    input wire wr_en,            // Write enable
+    input wire rd_en,            // Read enable
+    input wire [7:0] din,        // Data input
+    output reg [7:0] dout,       // Data output
+    output wire full,            // FIFO full flag
+    output wire empty            // FIFO empty flag
+);
+
+    parameter DEPTH = 16;
+    parameter ADDR_WIDTH = 4;    // log2(DEPTH) = 4 for 16-depth FIFO
+
+    reg [7:0] mem [0:DEPTH-1];   // Memory array
+    reg [ADDR_WIDTH-1:0] wr_ptr; // Write pointer
+    reg [ADDR_WIDTH-1:0] rd_ptr; // Read pointer
+    reg [ADDR_WIDTH:0] count;    // Count to track number of elements
+
+    // Write logic
+    always @(posedge clk) begin
+        if (rst) begin
+            wr_ptr <= 0;
+        end else if (wr_en && !full) begin
+            mem[wr_ptr] <= din;
+            wr_ptr <= wr_ptr + 1;
+        end
+    end
+
+    // Read logic
+    always @(posedge clk) begin
+        if (rst) begin
+            rd_ptr <= 0;
+            dout <= 0;
+        end else if (rd_en && !empty) begin
+            dout <= mem[rd_ptr];
+            rd_ptr <= rd_ptr + 1;
+        end
+    end
+
+    // Counter logic
+    always @(posedge clk) begin
+        if (rst) begin
+            count <= 0;
+        end else begin
+            case ({wr_en && !full, rd_en && !empty})
+                2'b10: count <= count + 1;  // write only
+                2'b01: count <= count - 1;  // read only
+                default: count <= count;    // no change or both
+            endcase
+        end
+    end
+
+    assign full = (count == DEPTH);
+    assign empty = (count == 0);
+
+endmodule
